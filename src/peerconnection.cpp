@@ -88,6 +88,10 @@ void PeerconnectionMgr::start()
   _count = 0;
   _prev_ts = 0.;
   _prev_bytes = 0.;
+  _key_frame = 0;
+  _frames = 0;
+
+  _file_bitstream.open("bitstream.264", std::ios::binary);
   
   webrtc::PeerConnectionInterface::RTCOfferAnswerOptions oa;
   oa.offer_to_receive_video = true;
@@ -144,8 +148,12 @@ void PeerconnectionMgr::stop()
   _stats_th_running = false;
   if(_stats_th.joinable()) _stats_th.join();
 
+  _file_bitstream.close();
+  
   _pc->Close();
-  _pc = nullptr;  
+  _pc = nullptr;
+
+  std::cout << "Received transformable frame : " << _frames << "\n";
 }
 
 void PeerconnectionMgr::set_remote_description(const std::string &sdp)
@@ -194,6 +202,36 @@ void PeerconnectionMgr::OnStatsDelivered(const rtc::scoped_refptr<const webrtc::
   stats.push_back(std::move(rtc_stats));
 }
 
+void PeerconnectionMgr::Transform(std::unique_ptr<webrtc::TransformableFrameInterface> transformable_frame)
+{
+  auto ssrc = transformable_frame->GetSsrc();
+
+  if(auto it = _callbacks.find(ssrc); it != _callbacks.end()) {
+    auto video_frame = static_cast<webrtc::TransformableVideoFrameInterface*>(transformable_frame.get());
+    if(video_frame->IsKeyFrame()) {
+      std::cout << "Received new key frame: " << ++_key_frame << "\n";
+    }
+
+    ++_frames;
+
+    if(_file_bitstream.is_open()) {
+      _file_bitstream.write((const char*)video_frame->GetData().data(), video_frame->GetData().size());
+    }
+    
+    it->second->OnTransformedFrame(std::move(transformable_frame));
+  }
+}
+
+void PeerconnectionMgr::RegisterTransformedFrameSinkCallback(rtc::scoped_refptr<webrtc::TransformedFrameCallback> callback, uint32_t ssrc)
+{
+  _callbacks[ssrc] = callback;
+}
+
+void PeerconnectionMgr::UnregisterTransformedFrameSinkCallback(uint32_t ssrc)
+{
+  _callbacks.erase(ssrc);
+}
+
 void PeerconnectionMgr::OnSignalingChange(webrtc::PeerConnectionInterface::SignalingState new_state) 
 {
   switch(new_state) {
@@ -230,7 +268,9 @@ void PeerconnectionMgr::OnTrack(rtc::scoped_refptr<webrtc::RtpTransceiverInterfa
       std::this_thread::sleep_for(std::chrono::seconds(1));
       ++_count;
     }
-  });  
+  });
+
+  transceiver->receiver()->SetDepacketizerToDecoderFrameTransformer(_me);
 }
 
 void PeerconnectionMgr::OnRemoveTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) 

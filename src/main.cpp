@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
   
   tunnel.connect();
 
-  std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 1, 0), T(30, 2000, 1, 0), {}, T(30, 1000, 50, 10)};
+  std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2500, 1, 0)};
   std::queue<TunnelMgr::Constraints> constraints(constraints_init);
 
   while(!constraints.empty()) {
