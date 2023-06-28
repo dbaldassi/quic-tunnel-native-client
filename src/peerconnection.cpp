@@ -271,6 +271,11 @@ void PeerconnectionMgr::OnTrack(rtc::scoped_refptr<webrtc::RtpTransceiverInterfa
   });
 
   transceiver->receiver()->SetDepacketizerToDecoderFrameTransformer(_me);
+
+  if(video_sink) {
+    auto track = static_cast<webrtc::VideoTrackInterface*>(transceiver->receiver()->track().get());
+    track->AddOrUpdateSink(video_sink, rtc::VideoSinkWants{});
+  }
 }
 
 void PeerconnectionMgr::OnRemoveTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) 

@@ -43,6 +43,8 @@ class PeerconnectionMgr : public webrtc::PeerConnectionObserver,
   
 public:
 
+  rtc::VideoSinkInterface<webrtc::VideoFrame> * video_sink = nullptr;
+
   struct RTCStats
   {
     int x;

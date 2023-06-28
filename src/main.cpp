@@ -1,6 +1,9 @@
 #include <iostream>
 
+#include <gtk/gtk.h>
+
 #include "tunnel_mgr.h"
+#include "main_wnd.h"
 
 #define T(TIME,BITRATE,DELAY,LOSS) std::make_tuple(TIME,BITRATE,DELAY,LOSS)
 
@@ -26,6 +29,17 @@ constexpr const int WS_SERVER_PORT = 3334;
 
 int main(int argc, char *argv[])
 {
+  gtk_init(&argc, &argv);
+
+#if !GLIB_CHECK_VERSION(2, 35, 0)
+  g_type_init();
+#endif
+  // g_thread_init API is deprecated since glib 2.31.0, see release note:
+  // http://mail.gnome.org/archives/gnome-announce-list/2011-October/msg00041.html
+#if !GLIB_CHECK_VERSION(2, 31, 0)
+  g_thread_init(NULL);
+#endif
+
   MedoozeMgr        medooze;
   PeerconnectionMgr pc;
   
@@ -50,9 +64,21 @@ int main(int argc, char *argv[])
   
   tunnel.connect();
 
-  std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2500, 1, 0)};
+  WindowRenderer window;
+  auto res = window.create();
+
+  if(!res) {
+    std::cout << "Could not create window" << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  pc.video_sink = &window;
+  
+  std::deque<TunnelMgr::Constraints> constraints_init{T(5, 2500, 1, 0), {}, T(5, 2500, 1, 0)};
   std::queue<TunnelMgr::Constraints> constraints(constraints_init);
 
+  std::thread([](){ gtk_main(); }).detach();
+  
   while(!constraints.empty()) {
     tunnel.start();
     tunnel.run(constraints);
@@ -61,6 +87,9 @@ int main(int argc, char *argv[])
   tunnel.disconnect();
 
   PeerconnectionMgr::clean();
+
+  gtk_main_quit();
+  window.destroy();
   
   return 0;
 }
