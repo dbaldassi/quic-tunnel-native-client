@@ -105,6 +105,7 @@ public:
   void stop();
 
   void run(std::queue<Constraints>& c);
+  void run_all(std::queue<Constraints>& c);
 
   void query_capabilities();
   void get_stats();

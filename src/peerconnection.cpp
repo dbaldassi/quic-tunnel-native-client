@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <chrono>
+#include <algorithm>
 
 #include <api/create_peerconnection_factory.h>
 #include <rtc_base/ssl_adapter.h>
@@ -92,14 +93,33 @@ void PeerconnectionMgr::start()
   _frames = 0;
 
   _file_bitstream.open("bitstream.264", std::ios::binary);
-  
-  webrtc::PeerConnectionInterface::RTCOfferAnswerOptions oa;
-  oa.offer_to_receive_video = true;
-  oa.offer_to_receive_audio = false;
 
-  _signaling_th->BlockingCall([this, oa]() {
+  // auto receiver_cap = pcf->GetRtpReceiverCapabilities(cricket::MediaType::MEDIA_TYPE_VIDEO);
+
+  // for(auto&& cap : receiver_cap.codecs) std::cout << cap.name << " ";
+  // std::cout << std::endl;
+  // std::erase_if(receiver_cap.codecs,
+  // 		[](auto&& cap) -> bool { return cap.name != cricket::kH264CodecName; });
+  // for(auto&& cap : receiver_cap.codecs) std::cout << cap.name << " ";
+  // std::cout << std::endl;
+    
+  webrtc::RtpTransceiverInit init;
+
+  init.direction = webrtc::RtpTransceiverDirection::kRecvOnly;
+  init.stream_ids = { "tunnel" };
+
+  auto expected_transceiver = _pc->AddTransceiver(cricket::MediaType::MEDIA_TYPE_VIDEO, init);
+  if(!expected_transceiver.ok()) return;
+  auto transceiver = expected_transceiver.value();
+
+  // auto err = transceiver->SetCodecPreferences(receiver_cap.codecs);
+  // if(!err.ok()) {
+  //   std::cout << "Could not set codec : " << err.message() << "\n";
+  // }
+
+  _signaling_th->BlockingCall([this]() {
     std::cout << "creating offer" << "\n";
-    _pc->CreateOffer(this, oa);
+    _pc->CreateOffer(this, {});
   });
 }
 
@@ -124,6 +144,8 @@ void PeerconnectionMgr::OnSetLocalDescriptionComplete(webrtc::RTCError error)
     std::string sdp;
     auto desc = _pc->local_description();
     desc->ToString(&sdp);
+
+    std::cout << sdp << "\n";
 
     if(onlocaldesc) onlocaldesc(sdp);
   }
@@ -170,14 +192,10 @@ void PeerconnectionMgr::set_remote_description(const std::string &sdp)
 }
 
 void PeerconnectionMgr::OnStatsDelivered(const rtc::scoped_refptr<const webrtc::RTCStatsReport>& report)
-{
-  std::cout << "PeerconnectionMgr::OnStatsDelivered" << "\n";
-  
+{  
   RTCStats rtc_stats;
 
   auto inbound_stats = report->GetStatsOfType<webrtc::RTCInboundRTPStreamStats>();
-
-  std::cout << inbound_stats.size() << "\n";
   
   for(const auto& s : inbound_stats) {
     if(*s->kind == webrtc::RTCMediaStreamTrackKind::kVideo) {
@@ -194,6 +212,15 @@ void PeerconnectionMgr::OnStatsDelivered(const rtc::scoped_refptr<const webrtc::
       rtc_stats.frame_decoded = s->frames_decoded.ValueOrDefault(0.);
       rtc_stats.frame_key_decoded = s->key_frames_decoded.ValueOrDefault(0.);
 
+      /*std::cout << "jitter : " << s->jitter_buffer_delay.ValueOrDefault(0.) << "\n"
+		<< "jitter target : " << s->jitter_buffer_target_delay.ValueOrDefault(0.) << "\n"
+		<< "jitter min : " << s->jitter_buffer_minimum_delay.ValueOrDefault(0.) << "\n"
+		<< "jitter flush : " << s->jitter_buffer_flushes.ValueOrDefault(0.) << "\n"
+		<< "packet fec : " << s->fec_packets_received.ValueOrDefault(0.) << "\n"
+	// << "packet rtx : " << s->retransmitted_bytes_received.ValueOrDefault(0.) << "\n"
+		<< "frame dropped : " << s->frames_dropped.ValueOrDefault(0.) << "\n"
+		<< "\n";*/
+      
       _prev_ts = ts_ms;
       _prev_bytes = *s->bytes_received;
     }
@@ -209,12 +236,17 @@ void PeerconnectionMgr::Transform(std::unique_ptr<webrtc::TransformableFrameInte
   if(auto it = _callbacks.find(ssrc); it != _callbacks.end()) {
     auto video_frame = static_cast<webrtc::TransformableVideoFrameInterface*>(transformable_frame.get());
     if(video_frame->IsKeyFrame()) {
-      std::cout << "Received new key frame: " << ++_key_frame << "\n";
+      std::cout << "Received new key frame: " << ++_key_frame << " num " << _frames << "\n";
     }
 
     ++_frames;
 
-    if(_file_bitstream.is_open()) {
+    // std::cout << "Frame num " << _frames << " : " << video_frame->GetData().size() << "\n";
+
+    /*std::cout << video_frame->GetMetadata().GetFrameId().value_or(-1) << " " << video_frame->GetMetadata().GetCodec() << " "
+      << video_frame->GetTimestamp() << " " << webrtc::ToString(video_frame->GetCaptureTimeIdentifier().value_or(webrtc::Timestamp::Seconds(0))) << "\n";*/
+    
+    if(_file_bitstream.is_open() && _key_frame >= 1) {
       _file_bitstream.write((const char*)video_frame->GetData().data(), video_frame->GetData().size());
     }
     

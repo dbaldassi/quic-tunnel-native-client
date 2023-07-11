@@ -5,6 +5,10 @@
 #include <chrono>
 #include <ranges>
 #include <algorithm>
+#include <string>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 #include "tunnel_mgr.h"
 
@@ -51,7 +55,8 @@ void CapabititiesVector::from_json(const std::vector<nlohmann::json>& data)
     auto cc = jcap["cc"].get<std::vector<std::string>>();
     c.cc = std::move(cc);
 
-    caps.push_back(std::move(c));
+    if(c.impl == "udp") c.cc.push_back("none");
+    if(c.impl != "tcp" && c.impl != "quicgo") caps.push_back(std::move(c));
   }
 }
 
@@ -93,7 +98,6 @@ void TunnelMgr::parse_client_response(const json& response)
     if(onstart) onstart();
     _pc.start();
     _cv.notify_all();
-    // client_stopped = false ?
     break;
   case STOP_REQUEST:
     _cv.notify_all();
@@ -101,7 +105,7 @@ void TunnelMgr::parse_client_response(const json& response)
   case CAPABILITIES_REQUEST:
     // capabilities affect
     _caps.from_json(data["in_impls"].get<std::vector<json>>());
-    
+    _cv.notify_all();
     // capabilities callback
     break;
   default:
@@ -142,9 +146,19 @@ void TunnelMgr::parse_server_response(const json& response)
   case UPLOAD_REQUEST:
     // nothing / ack
     break;
-  case GETSTATS_REQUEST:
+  case GETSTATS_REQUEST: {
+    std::string url = data["url"].get<std::string>();
+    auto pos = url.find("/", url.find("/") + 2);
+
+    // remove https://host/
+    fs::path path = url.substr(pos + 1);
+    path.remove_filename();
+
+    fs::copy("bitstream.264", path / fs::path{"bitstream.264"});
+    
     _cv2.notify_all();
     break;
+  }
   case LINK_REQUEST:
 
     break;
@@ -258,6 +272,39 @@ void TunnelMgr::run(std::queue<Constraints>& c)
   stop();
 }
 
+void TunnelMgr::run_all(std::queue<Constraints>& c)
+{
+  std::queue<Constraints> save = c;
+
+  constexpr int repet = 2;
+
+  for(int r = 0; r < repet; ++r) {
+    for(size_t impl = 0; impl < _caps.caps.size(); ++impl) {
+      auto [name, dgram, stream] = _caps[impl];
+      config.impl = name;
+      
+      for(int d = 0; d < 2; ++d) { 
+	if((d == 0 && !dgram) || (d == 1 && !stream)) continue;
+	config.datagrams = d == 0;
+		
+	for(size_t cc = 0; cc < _caps.caps[impl].cc.size(); ++cc) {	  
+	  config.cc = _caps[impl, cc];
+	  std::cout << "\n\n"
+		    << config.impl << " " << config.cc << " " << config.datagrams << " " << r
+		    << "\n\n";
+
+	  c = save;
+	
+	  while(!c.empty()) {
+	    start();
+	    run(c);
+	  }
+	}
+      }
+    }
+  }  
+}
+
 void TunnelMgr::query_capabilities()
 {
   std::cout << "TunnelMgr::query_capabilities" << std::endl;
@@ -267,6 +314,9 @@ void TunnelMgr::query_capabilities()
   };
 
   client.send("capabilities", CAPABILITIES_REQUEST, data);
+
+  std::unique_lock<std::mutex> lck(_cv_mutex);
+  _cv.wait(lck);
 }
 
 void TunnelMgr::get_stats()

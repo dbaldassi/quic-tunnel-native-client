@@ -1,4 +1,5 @@
 #include <iostream>
+#include <csignal>
 
 #include <gtk/gtk.h>
 
@@ -13,8 +14,8 @@ namespace config
 constexpr int medooze_port = 8084;
 constexpr const char * medooze_host = "192.168.1.33";
 
-constexpr int quic_server_port = 8888;
-constexpr const char * quic_server_host = "192.168.1.47";
+constexpr int quic_server_port = 49888;
+constexpr const char * quic_server_host = "37.187.105.121";
 
 constexpr bool enable_medooze_bwe = true;
 constexpr int medooze_probing = 2000;
@@ -49,9 +50,9 @@ int main(int argc, char *argv[])
   medooze.probing_bitrate = config::medooze_probing;
   
   TunnelMgr tunnel(medooze, pc);
-  tunnel.config.impl = "mvfst";
-  tunnel.config.cc = "newreno";
-  tunnel.config.datagrams = false;
+  tunnel.config.impl = "udp";
+  tunnel.config.cc = "none";
+  tunnel.config.datagrams = true;
   tunnel.config.quic_port = config::quic_server_port;
   tunnel.config.quic_host = config::quic_server_host;
   tunnel.config.external_file_transfer = false;
@@ -63,7 +64,8 @@ int main(int argc, char *argv[])
   tunnel.server.port = config::WS_SERVER_PORT;
   
   tunnel.connect();
-
+  tunnel.query_capabilities();
+  
   WindowRenderer window;
   auto res = window.create();
 
@@ -73,17 +75,28 @@ int main(int argc, char *argv[])
   }
 
   pc.video_sink = &window;
-  
-  std::deque<TunnelMgr::Constraints> constraints_init{T(5, 2500, 1, 0), {}, T(5, 2500, 1, 0)};
-  std::queue<TunnelMgr::Constraints> constraints(constraints_init);
 
   std::thread([](){ gtk_main(); }).detach();
   
-  while(!constraints.empty()) {
-    tunnel.start();
-    tunnel.run(constraints);
-  }
-
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(60, 2500, 50, 5)};
+  /* std::deque<TunnelMgr::Constraints> constraints_init{
+    T(60, 2500, 0, 0), {}, T(60, 2500, 25, 0), {}, T(60, 2500, 50, 0), {}, T(60, 2500, 100, 0), {},
+    T(60, 2500, 0, 1), {}, T(60, 2500, 25, 1), {}, T(60, 2500, 50, 1), {}, T(60, 2500, 100, 1), {},
+    T(60, 2500, 0, 5), {}, T(60, 2500, 25, 5), {}, T(60, 2500, 50, 5), {}, T(60, 2500, 100, 5), {},
+    T(60, 2500, 0, 10), {}, T(60, 2500, 25, 10), {}, T(60, 2500, 50, 10), {}, T(60, 2500, 100, 10),
+    }; */
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2500, 0, 0), T(15, 1000, 0, 0)};
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2500, 0, 0), T(30, 2500, 0, 5), T(30, 2500, 0, 10), T(30, 2500, 0, 20), T(30, 2500, 0, 30)};
+  std::deque<TunnelMgr::Constraints> constraints_init{T(120, 8000, 0, 0)};
+  std::queue<TunnelMgr::Constraints> constraints(constraints_init);
+  
+  // while(!constraints.empty()) {
+  //   tunnel.start();
+  //   tunnel.run(constraints);
+  // }
+  tunnel.run_all(constraints);
+  
+  tunnel.reset_link();
   tunnel.disconnect();
 
   PeerconnectionMgr::clean();
