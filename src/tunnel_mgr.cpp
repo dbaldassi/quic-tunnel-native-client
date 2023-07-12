@@ -126,12 +126,12 @@ void TunnelMgr::parse_server_response(const json& response)
 
     // start client
     json data = {
-      { "impl", config.impl },
-      { "datagrams", config.datagrams },
-      { "cc", config.cc },
-      { "quic_port", config.quic_port },
-      { "quic_host", config.quic_host },
-      { "external_file_transfer", config.external_file_transfer }
+      { "impl", in_config.impl },
+      { "datagrams", in_config.datagrams },
+      { "cc", in_config.cc },
+      { "quic_port", in_config.quic_port },
+      { "quic_host", in_config.quic_host },
+      { "external_file_transfer", in_config.external_file_transfer }
     };
 
     client.send("startclient", START_REQUEST, data);
@@ -192,18 +192,18 @@ void TunnelMgr::start()
   _running = true;
   _medooze.start();
 
-  config.rtp_port = _medooze.get_rtp_port();
+  out_config.rtp_port = _medooze.get_rtp_port();
   
   // start server
   json data = {
-    { "impl", config.impl },
-    { "datagrams", config.datagrams },
-    { "cc", config.cc },
-    { "port_out", config.rtp_port },
+    { "impl", out_config.impl },
+    { "datagrams", out_config.datagrams },
+    { "cc", out_config.cc },
+    { "port_out", out_config.rtp_port },
     { "addr_out", _medooze.host },
-    { "quic_port", config.quic_port },
-    { "quic_host", config.quic_host },
-    { "external_file_transfer", config.external_file_transfer }
+    { "quic_port", out_config.quic_port },
+    { "quic_host", out_config.quic_host },
+    { "external_file_transfer", out_config.external_file_transfer }
   };
 
   server.send("startserver", START_REQUEST, data);
@@ -281,16 +281,16 @@ void TunnelMgr::run_all(std::queue<Constraints>& c)
   for(int r = 0; r < repet; ++r) {
     for(size_t impl = 0; impl < _caps.caps.size(); ++impl) {
       auto [name, dgram, stream] = _caps[impl];
-      config.impl = name;
+      out_config.impl = name;
       
       for(int d = 0; d < 2; ++d) { 
 	if((d == 0 && !dgram) || (d == 1 && !stream)) continue;
-	config.datagrams = d == 0;
+	out_config.datagrams = d == 0;
 		
 	for(size_t cc = 0; cc < _caps.caps[impl].cc.size(); ++cc) {	  
-	  config.cc = _caps[impl, cc];
+	  out_config.cc = _caps[impl, cc];
 	  std::cout << "\n\n"
-		    << config.impl << " " << config.cc << " " << config.datagrams << " " << r
+		    << out_config.impl << " " << out_config.cc << " " << out_config.datagrams << " " << r
 		    << "\n\n";
 
 	  c = save;
@@ -330,12 +330,12 @@ void TunnelMgr::get_stats()
   std::string date = std::ctime(&now);
   std::ranges::replace(date, ' ', '_');
 
-  oss << config.impl << "_" << config.cc << "_" << ((config.datagrams) ? "dgram" : "stream") << "_"
-      << date.substr(0, date.size() - 1) << (config.external_file_transfer ? "_scp" : "");
+  oss << out_config.impl << "_" << out_config.cc << "_" << ((out_config.datagrams) ? "dgram" : "stream") << "_"
+      << date.substr(0, date.size() - 1) << (out_config.external_file_transfer ? "_scp" : "");
 
   json data = {
     { "exp_name", oss.str() },
-    { "transport", ((config.impl == "tcp" || config.impl == "udp") ? config.impl : "quic") },
+    { "transport", ((out_config.impl == "tcp" || out_config.impl == "udp") ? out_config.impl : "quic") },
     { "medooze_dump_url", _medooze.csv_url }
   };
 

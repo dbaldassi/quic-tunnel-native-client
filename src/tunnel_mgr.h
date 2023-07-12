@@ -84,7 +84,7 @@ public:
     int         quic_port;
     std::string quic_host;
     bool        external_file_transfer;
-  } config;
+  } in_config, out_config;
 
   TunnelSocket client;
   TunnelSocket server;

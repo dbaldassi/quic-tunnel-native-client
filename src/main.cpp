@@ -14,8 +14,8 @@ namespace config
 constexpr int medooze_port = 8084;
 constexpr const char * medooze_host = "192.168.1.33";
 
-constexpr int quic_server_port = 49888;
-constexpr const char * quic_server_host = "37.187.105.121";
+constexpr int quic_server_port = 8888;
+constexpr const char * quic_server_host = "192.168.1.47";
 
 constexpr bool enable_medooze_bwe = true;
 constexpr int medooze_probing = 2000;
@@ -50,12 +50,15 @@ int main(int argc, char *argv[])
   medooze.probing_bitrate = config::medooze_probing;
   
   TunnelMgr tunnel(medooze, pc);
-  tunnel.config.impl = "udp";
-  tunnel.config.cc = "none";
-  tunnel.config.datagrams = true;
-  tunnel.config.quic_port = config::quic_server_port;
-  tunnel.config.quic_host = config::quic_server_host;
-  tunnel.config.external_file_transfer = false;
+  tunnel.in_config.impl = "mvfst";
+  tunnel.in_config.cc = "newreno";
+  tunnel.in_config.datagrams = false;
+  tunnel.in_config.quic_port = config::quic_server_port;
+  tunnel.in_config.quic_host = config::quic_server_host;
+  tunnel.in_config.external_file_transfer = false;
+
+  tunnel.out_config = tunnel.in_config;
+  tunnel.out_config.impl = "quicgo";
 
   tunnel.client.host = config::WS_CLIENT_HOST;
   tunnel.client.port = config::WS_CLIENT_PORT;
@@ -90,11 +93,11 @@ int main(int argc, char *argv[])
   std::deque<TunnelMgr::Constraints> constraints_init{T(120, 8000, 0, 0)};
   std::queue<TunnelMgr::Constraints> constraints(constraints_init);
   
-  // while(!constraints.empty()) {
-  //   tunnel.start();
-  //   tunnel.run(constraints);
-  // }
-  tunnel.run_all(constraints);
+  while(!constraints.empty()) {
+    tunnel.start();
+    tunnel.run(constraints);
+  }
+  // tunnel.run_all(constraints);
   
   tunnel.reset_link();
   tunnel.disconnect();
