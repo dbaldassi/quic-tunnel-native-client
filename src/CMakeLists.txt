@@ -20,6 +20,8 @@ target_sources( qclient PRIVATE
   tunnel_mgr.h
   main_wnd.h
   main_wnd.cpp
+  tunnel_loggin.h
+  tunnel_loggin.cpp
   )
 
 target_include_directories( qclient PRIVATE

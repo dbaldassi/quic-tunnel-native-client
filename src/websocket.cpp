@@ -49,7 +49,7 @@ websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> WebSocketSecu
                      asio::ssl::context::single_dh_use);
   }
   catch (std::exception& e) {
-    std::cout << "on tls init error" << std::endl;
+    TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "on tls init error";
   }
 
   return ctx;

@@ -56,7 +56,8 @@ void CapabititiesVector::from_json(const std::vector<nlohmann::json>& data)
     c.cc = std::move(cc);
 
     if(c.impl == "udp") c.cc.push_back("none");
-    if(c.impl != "tcp" && c.impl != "quicgo") caps.push_back(std::move(c));
+
+    caps.push_back(std::move(c));
   }
 }
 
@@ -66,12 +67,12 @@ TunnelMgr::TunnelMgr(MedoozeMgr& m, PeerconnectionMgr& pc)
   : _medooze(m), _pc(pc)
 {
   client.socket.onmessage = [this](auto&& msg) {
-    if(msg["type"] == "error") RTC_LOG(LS_ERROR) << "Client received error" << msg["data"]["message"];
+    if(msg["type"] == "error") TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "Client received error" << msg["data"]["message"];
     else if(msg["type"] == "response") parse_client_response(msg);
   };
 
   server.socket.onmessage = [this](auto&& msg) {
-    if(msg["type"] == "error") RTC_LOG(LS_ERROR) << "Server received error" << msg["data"]["message"];
+    if(msg["type"] == "error") TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "Server received error" << msg["data"]["message"];
     else if(msg["type"] == "response") parse_server_response(msg);
   };
 
@@ -86,7 +87,7 @@ TunnelMgr::~TunnelMgr()
 
 void TunnelMgr::parse_client_response(const json& response)
 {
-  std::cout << "client received : " << response.dump() << "\n";
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "client received : " << response.dump();
   
   int req = response["transId"].get<int>();
 
@@ -115,7 +116,7 @@ void TunnelMgr::parse_client_response(const json& response)
 
 void TunnelMgr::parse_server_response(const json& response)
 {
-  std::cout << "server received : " << response.dump() << "\n";
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "server received : " << response.dump();
   int req = response["transId"].get<int>();
 
   auto data = response["data"];
@@ -169,26 +170,26 @@ void TunnelMgr::parse_server_response(const json& response)
 
 void TunnelMgr::connect()
 {
-  std::cout << "TunnelMgr::connect" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "TunnelMgr::connect";
 
-  std::cout << "connect client" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "connect client";
   client.connect();
-  std::cout << "connect server" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "connect server";
   server.connect();
   
-  std::cout << "TunnelMgr::connect end" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::INFO) << "TunnelMgr::connected";
 }
 
 void TunnelMgr::disconnect()
 {
-  std::cout << "TunnelMgr::disconnect" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::INFO) << "TunnelMgr::disconnect";
   client.disconnect();
   server.disconnect();
 }
 
 void TunnelMgr::start()
 {
-  std::cout << "TunnelMgr::start" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::INFO) << "TunnelMgr::start";
   _running = true;
   _medooze.start();
 
@@ -214,7 +215,7 @@ void TunnelMgr::start()
 
 void TunnelMgr::stop()
 {
-  std::cout << "TunnelMgr::stop" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::INFO) << "TunnelMgr::stop";
   _running = false;
 
   upload_stats();
@@ -251,7 +252,8 @@ void TunnelMgr::stop()
 
 void TunnelMgr::run(std::queue<Constraints>& c)
 {
-  std::cout << "TunnelMgr::run" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::INFO) << "TunnelMgr::run";
+  
   if(!_running) return;
 
   while(!c.empty()) {
@@ -272,26 +274,34 @@ void TunnelMgr::run(std::queue<Constraints>& c)
   stop();
 }
 
-void TunnelMgr::run_all(std::queue<Constraints>& c)
+void TunnelMgr::run_all(int repet, std::queue<Constraints>& c)
 {
   std::queue<Constraints> save = c;
 
-  constexpr int repet = 2;
-
+  TUNNEL_LOG(TunnelLogging::Severity::INFO) << "--- Running all implementations ---";
+  
   for(int r = 0; r < repet; ++r) {
+    TUNNEL_LOG(TunnelLogging::Severity::INFO) << "# Repet : " << (r + 1);
+    
     for(size_t impl = 0; impl < _caps.caps.size(); ++impl) {
       auto [name, dgram, stream] = _caps[impl];
       out_config.impl = name;
+      in_config.impl = name;
+
+      TUNNEL_LOG(TunnelLogging::Severity::INFO) << "## Impl : " << name;
       
       for(int d = 0; d < 2; ++d) { 
 	if((d == 0 && !dgram) || (d == 1 && !stream)) continue;
 	out_config.datagrams = d == 0;
+	in_config.datagrams = d == 0;
+
+	TUNNEL_LOG(TunnelLogging::Severity::INFO) << "### Datagram ? : " << ((d == 0) ? "Yes" : "No");
 		
 	for(size_t cc = 0; cc < _caps.caps[impl].cc.size(); ++cc) {	  
 	  out_config.cc = _caps[impl, cc];
-	  std::cout << "\n\n"
-		    << out_config.impl << " " << out_config.cc << " " << out_config.datagrams << " " << r
-		    << "\n\n";
+	  in_config.cc = _caps[impl, cc];
+
+	  TUNNEL_LOG(TunnelLogging::Severity::INFO) << "#### cc : " << out_config.cc;
 
 	  c = save;
 	
@@ -299,15 +309,19 @@ void TunnelMgr::run_all(std::queue<Constraints>& c)
 	    start();
 	    run(c);
 	  }
+
+	  if(out_config.datagrams) break;
 	}
       }
     }
-  }  
+  }
+
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "Finito";
 }
 
 void TunnelMgr::query_capabilities()
 {
-  std::cout << "TunnelMgr::query_capabilities" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "TunnelMgr::query_capabilities";
   json data = {
     { "out_requested", false },
     { "in_requested", true }
@@ -322,7 +336,7 @@ void TunnelMgr::query_capabilities()
 void TunnelMgr::get_stats()
 {
   using namespace std::chrono;
-  std::cout << "TunnelMgr::getstats" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "TunnelMgr::getstats";
   
   std::ostringstream oss;
 
@@ -345,7 +359,7 @@ void TunnelMgr::get_stats()
 void TunnelMgr::upload_stats()
 {
   namespace ranges = std::ranges;
-  std::cout << "TunnelMgr::upload_stats" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "TunnelMgr::upload_stats";
 
   std::vector<json> stats_data;
   
@@ -369,13 +383,13 @@ void TunnelMgr::upload_stats()
 
 void TunnelMgr::reset_link()
 {
-  std::cout << "TunnelMgr::reset_link" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "TunnelMgr::reset_link";
   server.send("link", LINK_REQUEST, json{});
 }
 
 void TunnelMgr::set_link(int bitrate, int delay, int loss)
 {
-  std::cout << "TunnelMgr::set_link" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "TunnelMgr::set_link";
   json data = {
     { "bitrate", bitrate },
     { "delay", delay },

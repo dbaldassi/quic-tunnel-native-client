@@ -8,6 +8,8 @@
 #include <functional>
 #include <string_view>
 
+#include "tunnel_loggin.h"
+
 #define ASIO_STANDALONE
 #define _WEBSOCKETPP_CPP11_STL_
 #define _WEBSOCKETPP_CPP11_THREAD_
@@ -46,14 +48,14 @@ protected:
   
   void on_opened(websocketpp::connection_hdl hdl)
   {
-    std::cout << "ws on open" << std::endl;
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "ws on open";
     _is_closed = false;
     if(onopen) onopen();
   }
   
   void on_closed(websocketpp::connection_hdl hdl)
   {
-    std::cout << "ws on close" << std::endl;
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "ws on close";
     if(onclose) onclose();
   }
   
@@ -74,20 +76,20 @@ public:
 
   void connect(const std::string& url, const std::string& protocol)
   {
-    std::cout << "Websocket::connect : " << url << " " << protocol << std::endl;
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "Websocket::connect : " << url << " " << protocol;
     websocketpp::lib::error_code ec;
 
     try {   
       _connection = _client.get_connection(url, ec);
       if (!_connection) {
-	std::cerr << "No WebSocket connection" << "\n";
+	TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "No WebSocket connection";
 	return;
       }
 
       std::unique_lock<std::mutex> lock(_mutex);
       _connection->set_close_handshake_timeout(5000);
       if (ec) {
-	std::cerr << "Error establishing websocket connection: " << ec.message() << "\n";
+	TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "Error establishing websocket connection: " << ec.message();
 	return;
       }
 
@@ -104,7 +106,7 @@ public:
       _thread = std::thread([this]() { _client.run(); });
     }
     catch (const std::exception& e) {
-      std::cerr << "Connect exception: " <<  e.what() << "\n";
+      TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "Connect exception: " <<  e.what();
       return;
     }
   }
@@ -113,7 +115,7 @@ public:
   void disconnect()
   {
     std::unique_lock<std::mutex> lock(_mutex);
-    std::cout << "Websocket::disconnect" << std::endl;
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "Websocket::disconnect";
   
     if (!_connection) return;
 
@@ -124,7 +126,9 @@ public:
       if (!_is_closed) {
 	_client.close(_connection, websocketpp::close::status::going_away, std::string{"disconnect"}, ec);
 	_is_closed = true;
-	if (ec) std::cerr << "Error on disconnect close: " << ec.message();
+	if (ec) {
+	  TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "Error on disconnect close: " << ec.message();
+	}
       }
       close_lock.unlock();
 
@@ -133,7 +137,7 @@ public:
       _connection = nullptr;
     }
     catch (const std::exception& e) {
-      std::cerr << "Disconnect exception: " << e.what() << std::endl;
+      TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "Disconnect exception: " << e.what();
     }
   }
 

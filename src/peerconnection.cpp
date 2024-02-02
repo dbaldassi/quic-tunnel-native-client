@@ -18,6 +18,8 @@
 
 #include <pc/session_description.h>
 
+#include "tunnel_loggin.h"
+
 rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> PeerconnectionMgr::_pcf = nullptr;
 std::unique_ptr<rtc::Thread> PeerconnectionMgr::_signaling_th = nullptr;
 
@@ -64,7 +66,7 @@ PeerconnectionMgr::~PeerconnectionMgr()
 
 void PeerconnectionMgr::start()
 {
-  std::cout << "Start peerconnection" << "\n";
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "Start peerconnection";
   
   auto pcf = get_pcf();
 
@@ -78,7 +80,7 @@ void PeerconnectionMgr::start()
   auto res = pcf->CreatePeerConnectionOrError(config, std::move(deps));
 
   if(!res.ok()) {
-    std::cerr << "Can't create peerconnection : " << res.error().message() << std::endl;
+    TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "Can't create peerconnection : " << res.error().message();
     throw std::runtime_error("Could not create peerconection");
   }
 
@@ -118,14 +120,14 @@ void PeerconnectionMgr::start()
   // }
 
   _signaling_th->BlockingCall([this]() {
-    std::cout << "creating offer" << "\n";
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "creating offer";
     _pc->CreateOffer(this, {});
   });
 }
 
 void PeerconnectionMgr::OnSuccess(webrtc::SessionDescriptionInterface* desc)
 {
-  std::cout << "On create offer success" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "On create offer success";
 
   _pc->SetLocalDescription(std::unique_ptr<webrtc::SessionDescriptionInterface>(desc), _me);
   
@@ -133,40 +135,40 @@ void PeerconnectionMgr::OnSuccess(webrtc::SessionDescriptionInterface* desc)
 
 void PeerconnectionMgr::OnFailure(webrtc::RTCError error)
 {
-  std::cout << "On create offer failure" << "\n";
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "On create offer failure";
 }
 
 void PeerconnectionMgr::OnSetLocalDescriptionComplete(webrtc::RTCError error)
 {
   if(error.ok()) {
-    std::cout << "On set local desc success" << "\n";
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "On set local desc success";
     
     std::string sdp;
     auto desc = _pc->local_description();
     desc->ToString(&sdp);
 
-    std::cout << sdp << "\n";
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << sdp;
 
     if(onlocaldesc) onlocaldesc(sdp);
   }
   else {
-    std::cerr << "On set local desc failure" << "\n";
+    TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "On set local desc failure";
   }
 }
 
 void PeerconnectionMgr::OnSetRemoteDescriptionComplete(webrtc::RTCError error)
 {
   if(error.ok()) {
-    std::cout << "On set remote desc success" << std::endl;
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "On set remote desc success";
   }
   else {
-    std::cerr << "On set remote desc failure" << std::endl;
+    TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "On set remote desc failure";
   }
 }
 
 void PeerconnectionMgr::stop()
 {
-  std::cout << "PeerConnection::Stop" << "\n";
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "PeerConnection::Stop" << "\n";
   _stats_th_running = false;
   if(_stats_th.joinable()) _stats_th.join();
 
@@ -175,16 +177,16 @@ void PeerconnectionMgr::stop()
   _pc->Close();
   _pc = nullptr;
 
-  std::cout << "Received transformable frame : " << _frames << "\n";
+  TUNNEL_LOG(TunnelLogging::Severity::INFO) << "Received transformable frame : " << _frames;
 }
 
 void PeerconnectionMgr::set_remote_description(const std::string &sdp)
 {
-  std::cout << "Set remote desc" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "Set remote desc";
   auto desc = webrtc::CreateSessionDescription(webrtc::SdpType::kAnswer, sdp);
 
   if(!desc) {
-    std::cerr << "Error parsing remote sdp" << "\n";
+    TUNNEL_LOG(TunnelLogging::Severity::ERROR) << "Error parsing remote sdp" << "\n";
     throw std::runtime_error("Could not set remote description");
   }
 
@@ -236,8 +238,12 @@ void PeerconnectionMgr::Transform(std::unique_ptr<webrtc::TransformableFrameInte
   if(auto it = _callbacks.find(ssrc); it != _callbacks.end()) {
     auto video_frame = static_cast<webrtc::TransformableVideoFrameInterface*>(transformable_frame.get());
     if(video_frame->IsKeyFrame()) {
-      std::cout << "Received new key frame: " << ++_key_frame << " num " << _frames << "\n";
+      // std::cout << "Received new key frame: " << ++_key_frame << " num " << _frames << " size " << transformable_frame->GetData().size() << "\n";
     }
+    else {
+      // std::cout << "Received p frame: " << " size " << transformable_frame->GetData().size() << "\n";
+    }
+
 
     ++_frames;
 
@@ -268,11 +274,10 @@ void PeerconnectionMgr::OnSignalingChange(webrtc::PeerConnectionInterface::Signa
 {
   switch(new_state) {
   case webrtc::PeerConnectionInterface::SignalingState::kClosed:
-    std::cout << "pc on closed" << std::endl;
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "pc on closed";
     break;
   case webrtc::PeerConnectionInterface::SignalingState::kStable:
-    std::cout << "pc on stable" << "\n";
-    break;
+    TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "pc on stable";
   default:
     break;
   }
@@ -289,7 +294,7 @@ void PeerconnectionMgr::OnAddTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterfa
 
 void PeerconnectionMgr::OnTrack(rtc::scoped_refptr<webrtc::RtpTransceiverInterface> transceiver) 
 {
-  std::cout << "PeerconnectionMgr::OnTrack" << "\n";
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "PeerconnectionMgr::OnTrack";
   
   _stats_th = std::thread([this, transceiver]() {
     _stats_th_running = true;

@@ -1,17 +1,17 @@
 #include <iostream>
 #include "medooze_mgr.h"
 
-#include <rtc_base/logging.h>
+#include "tunnel_loggin.h"
 
 MedoozeMgr::MedoozeMgr()
 {
-  _ws.onopen = []() { std::cout << "medooze ws opened" << "\n"; };
-  _ws.onclose = []() { std::cout << "medooze ws closed" << "\n"; };
+  _ws.onopen = []() { TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "medooze ws opened"; };
+  _ws.onclose = []() { TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "medooze ws closed"; };
 }
 
 void MedoozeMgr::start()
 {
-  std::cout << "Start connection medooze manager" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "Start connection medooze manager";
   
   _ws.connect(host, port , "quic-relay-loopback");
   _ws.onmessage = [this](auto&& msg) {
@@ -31,7 +31,7 @@ void MedoozeMgr::stop()
 
 void MedoozeMgr::view(const std::string& sdp)
 {
-  std::cout << "MedoozeManager::view" << std::endl;
+  TUNNEL_LOG(TunnelLogging::Severity::VERBOSE) << "MedoozeManager::view";
   
   json cmd = {
     { "cmd", "view" },
