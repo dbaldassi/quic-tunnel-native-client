@@ -288,6 +288,8 @@ void TunnelMgr::run_all(int repet, std::queue<Constraints>& c)
       out_config.impl = name;
       in_config.impl = name;
 
+      if(name == "quiche") continue;
+
       TUNNEL_LOG(TunnelLogging::Severity::INFO) << "## Impl : " << name;
       
       for(int d = 0; d < 2; ++d) { 

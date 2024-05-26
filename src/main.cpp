@@ -15,28 +15,23 @@ namespace config
 
 constexpr int medooze_port = 8084;
 constexpr const char * medooze_host = "192.168.1.30";
-// constexpr const char * medooze_host = "172.20.10.4";
 
 // constexpr int quic_server_port = 49888;
-// constexpr int quic_server_port = 8888;
-constexpr int quic_server_port = 50084;
-// constexpr const char * quic_server_host = "37.187.105.121";
+constexpr int quic_server_port = 8888;
+// constexpr int quic_server_port = 50084;
+
 // constexpr const char * quic_server_host = "88.121.171.111";
-// constexpr const char * quic_server_host = "192.168.1.47";
-// constexpr const char * quic_server_host = "192.168.0.100";
-constexpr const char * quic_server_host = "192.168.1.30";
+constexpr const char * quic_server_host = "192.168.1.47";
+// constexpr const char * quic_server_host = "192.168.1.30";
 
 constexpr bool enable_medooze_bwe = true;
 constexpr int medooze_probing = 2000;
 
-// constexpr const char * WS_CLIENT_HOST = "172.20.10.4";
 constexpr const char * WS_CLIENT_HOST = "192.168.1.30";
 constexpr const int WS_CLIENT_PORT = 3333;
 
-// constexpr const char * WS_SERVER_HOST = "192.168.1.47";
-// constexpr const char * WS_SERVER_HOST = "192.168.0.100";
-constexpr const char * WS_SERVER_HOST = "192.168.1.30";
-// constexpr const char * WS_SERVER_HOST = "88.121.171.111";
+ constexpr const char * WS_SERVER_HOST = "192.168.1.47";
+// constexpr const char * WS_SERVER_HOST = "192.168.1.30";
 constexpr const int WS_SERVER_PORT = 3334;
 
 }
@@ -67,8 +62,8 @@ int main(int argc, char *argv[])
   medooze.probing_bitrate = config::medooze_probing;
   
   TunnelMgr tunnel(medooze, pc);
-  tunnel.in_config.impl = "mvfst";
-  tunnel.in_config.cc = "bbr";
+  tunnel.in_config.impl = "msquic";
+  tunnel.in_config.cc = "cubic";
   tunnel.in_config.datagrams = false;
   tunnel.in_config.quic_port = config::quic_server_port;
   tunnel.in_config.quic_host = config::quic_server_host;
@@ -109,7 +104,11 @@ int main(int argc, char *argv[])
   // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2500, 0, 0), T(15, 1000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2500, 0, 0), T(30, 2500, 0, 0), T(30, 2500, 0, 0), T(30, 2500, 0, 0), T(15, 1000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0)};
-  std::deque<TunnelMgr::Constraints> constraints_init{T(5, 3000, 0, 0)};
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(300, 3000, 0, 0)};
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 3000, 5, 0), {}, T(30, 3000, 10, 0), {}, T(30, 3000, 20, 0), {}, T(30, 3000, 30, 0), {}, T(30, 3000, 0, 0)};
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2000, 0, 0), T(30, 2000, 0, 5), T(30, 2000, 0, 10), T(30, 2000, 0, 20), T(30, 2000, 0, 30)};
+  std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2000, 0, 0), T(15, 1000, 0, 0)};
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(300, 3000, 0, 0)};
   std::queue<TunnelMgr::Constraints> constraints(constraints_init);
   
   // while(!constraints.empty()) {
@@ -117,7 +116,7 @@ int main(int argc, char *argv[])
   //   tunnel.run(constraints);
   // }
 
-  constexpr int repet = 2;
+  constexpr int repet = 5;
   tunnel.run_all(repet, constraints);
   
   tunnel.reset_link();
