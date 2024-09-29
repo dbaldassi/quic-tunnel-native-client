@@ -70,6 +70,9 @@ class TunnelMgr
 
   std::condition_variable _cv, _cv2;
   std::mutex _cv_mutex, _cv_mutex2;
+
+  std::string curl_cmd;
+  std::filesystem::path _result_path;
   
 public:
 

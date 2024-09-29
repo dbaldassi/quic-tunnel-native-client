@@ -7,6 +7,11 @@
 #include <algorithm>
 #include <string>
 #include <filesystem>
+#include <cstdlib>
+#include <sys/wait.h>
+
+#define FMT_HEADER_ONLY
+#include <fmt/format.h>
 
 namespace fs = std::filesystem;
 
@@ -152,11 +157,11 @@ void TunnelMgr::parse_server_response(const json& response)
     auto pos = url.find("/", url.find("/") + 2);
 
     // remove https://host/
-    fs::path path = url.substr(pos + 1);
-    path.remove_filename();
+    _result_path = url.substr(pos + 1);
+    _result_path.remove_filename();
 
-    fs::copy("bitstream.264", path / fs::path{"bitstream.264"});
-    
+    // fs::copy("bitstream.264", path / fs::path{"bitstream.264"});
+
     _cv2.notify_all();
     break;
   }
@@ -218,6 +223,8 @@ void TunnelMgr::stop()
   TUNNEL_LOG(TunnelLogging::Severity::INFO) << "TunnelMgr::stop";
   _running = false;
 
+  reset_link();
+  
   upload_stats();
 
   _medooze.stop();
@@ -248,6 +255,9 @@ void TunnelMgr::stop()
   
   std::unique_lock<std::mutex> lck(_cv_mutex2);
   _cv2.wait(lck);
+  
+  std::string cmd = fmt::format("cd {} && zip upload.zip * && {}", _result_path.string(), curl_cmd);
+  std::system(cmd.c_str());
 }
 
 void TunnelMgr::run(std::queue<Constraints>& c)
@@ -355,6 +365,9 @@ void TunnelMgr::get_stats()
     { "medooze_dump_url", _medooze.csv_url }
   };
 
+  curl_cmd = fmt::format("curl http://localhost:4455 -Ffile=@upload.zip -Fexp=bitrate_test -Freliability={} -Fcc={} -Fimpl={}",
+			 ((out_config.datagrams) ? "dgram" : "stream"), out_config.cc, out_config.impl);
+  
   server.send("getstats", GETSTATS_REQUEST, data);
 }
 

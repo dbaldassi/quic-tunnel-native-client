@@ -2,8 +2,7 @@
 add_executable( qclient )
 
 target_compile_options( qclient PRIVATE
-  -Wall -Wextra -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-null-pointer-subtraction -fexperimental-library 
-  -fmodules
+  -Wall -Wextra -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-null-pointer-subtraction -fexperimental-library
   )
 
 set_target_properties( qclient PROPERTIES CXX_STANDARD 23 )
@@ -36,6 +35,7 @@ target_link_libraries( qclient PRIVATE
   ${CAIRO_LIBRARIES}
   ${GTK_LIBRARIES}
   nlohmann_json
+  # /usr/local/lib/libfmt.a
   )
 
 target_compile_options( qclient PRIVATE ${GTK_CFLAGS_OTHER} )

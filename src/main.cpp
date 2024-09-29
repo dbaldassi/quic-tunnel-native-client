@@ -1,6 +1,8 @@
 #include <iostream>
 #include <csignal>
 #include <thread>
+#include <cstdlib>
+#include <unistd.h>
 
 #include <gtk/gtk.h>
 
@@ -30,7 +32,7 @@ constexpr int medooze_probing = 2000;
 constexpr const char * WS_CLIENT_HOST = "192.168.1.30";
 constexpr const int WS_CLIENT_PORT = 3333;
 
- constexpr const char * WS_SERVER_HOST = "192.168.1.47";
+constexpr const char * WS_SERVER_HOST = "192.168.1.47";
 // constexpr const char * WS_SERVER_HOST = "192.168.1.30";
 constexpr const int WS_SERVER_PORT = 3334;
 
@@ -62,8 +64,8 @@ int main(int argc, char *argv[])
   medooze.probing_bitrate = config::medooze_probing;
   
   TunnelMgr tunnel(medooze, pc);
-  tunnel.in_config.impl = "msquic";
-  tunnel.in_config.cc = "cubic";
+  tunnel.in_config.impl = "mvfst";
+  tunnel.in_config.cc = "newreno";
   tunnel.in_config.datagrams = false;
   tunnel.in_config.quic_port = config::quic_server_port;
   tunnel.in_config.quic_host = config::quic_server_host;
@@ -101,13 +103,13 @@ int main(int argc, char *argv[])
     T(60, 2500, 0, 5), {}, T(60, 2500, 25, 5), {}, T(60, 2500, 50, 5), {}, T(60, 2500, 100, 5), {},
     T(60, 2500, 0, 10), {}, T(60, 2500, 25, 10), {}, T(60, 2500, 50, 10), {}, T(60, 2500, 100, 10),
     };*/
-  // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2500, 0, 0), T(15, 1000, 0, 0)};
+  std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2500, 0, 0), T(15, 1000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2500, 0, 0), T(30, 2500, 0, 0), T(30, 2500, 0, 0), T(30, 2500, 0, 0), T(15, 1000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(300, 3000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 3000, 5, 0), {}, T(30, 3000, 10, 0), {}, T(30, 3000, 20, 0), {}, T(30, 3000, 30, 0), {}, T(30, 3000, 0, 0)};
-  // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2000, 0, 0), T(30, 2000, 0, 5), T(30, 2000, 0, 10), T(30, 2000, 0, 20), T(30, 2000, 0, 30)};
-  std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2000, 0, 0), T(15, 1000, 0, 0)};
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2500, 0, 0), T(30, 2500, 0, 5), T(30, 2500, 0, 10), T(30, 2500, 0, 20), T(30, 2500, 0, 30)};
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2000, 0, 0), T(15, 1000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(300, 3000, 0, 0)};
   std::queue<TunnelMgr::Constraints> constraints(constraints_init);
   
@@ -125,7 +127,7 @@ int main(int argc, char *argv[])
   tunnel.disconnect();
 
   PeerconnectionMgr::clean();
-
+  
   gtk_main_quit();
   window.destroy();
   
