@@ -3,12 +3,16 @@
 #include <thread>
 #include <cstdlib>
 #include <unistd.h>
+#include <array>
 
 #include <gtk/gtk.h>
 
 #include "tunnel_loggin.h"
 #include "tunnel_mgr.h"
 #include "main_wnd.h"
+
+#define FMT_HEADER_ONLY
+#include <fmt/format.h>
 
 #define T(TIME,BITRATE,DELAY,LOSS) std::make_tuple(TIME,BITRATE,DELAY,LOSS)
 
@@ -64,6 +68,8 @@ int main(int argc, char *argv[])
   medooze.probing_bitrate = config::medooze_probing;
   
   TunnelMgr tunnel(medooze, pc);
+  tunnel.exp_name = "stats_line_loss";
+  
   tunnel.in_config.impl = "mvfst";
   tunnel.in_config.cc = "newreno";
   tunnel.in_config.datagrams = false;
@@ -83,6 +89,9 @@ int main(int argc, char *argv[])
   
   tunnel.connect();
   tunnel.query_capabilities();
+
+  // tunnel.reset_link();
+  // return 0;
   
   WindowRenderer window;
   auto res = window.create();
@@ -103,23 +112,56 @@ int main(int argc, char *argv[])
     T(60, 2500, 0, 5), {}, T(60, 2500, 25, 5), {}, T(60, 2500, 50, 5), {}, T(60, 2500, 100, 5), {},
     T(60, 2500, 0, 10), {}, T(60, 2500, 25, 10), {}, T(60, 2500, 50, 10), {}, T(60, 2500, 100, 10),
     };*/
-  std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2500, 0, 0), T(15, 1000, 0, 0)};
+  std::deque<TunnelMgr::Constraints> bitrate_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2500, 0, 0), T(15, 1000, 0, 0)};
+  // std::deque<TunnelMgr::Constraints> constraints_init{T(15, 1000, 0, 0), T(15, 500, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2500, 0, 0), T(30, 2500, 0, 0), T(30, 2500, 0, 0), T(30, 2500, 0, 0), T(15, 1000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0), {}, T(600, 8000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(300, 3000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 3000, 5, 0), {}, T(30, 3000, 10, 0), {}, T(30, 3000, 20, 0), {}, T(30, 3000, 30, 0), {}, T(30, 3000, 0, 0)};
-  // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 2500, 0, 0), T(30, 2500, 0, 5), T(30, 2500, 0, 10), T(30, 2500, 0, 20), T(30, 2500, 0, 30)};
+  std::deque<TunnelMgr::Constraints> loss_init{T(30, 2500, 0, 0), T(30, 2500, 0, 5), T(30, 2500, 0, 10), T(30, 2500, 0, 20), T(30, 2500, 0, 30)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(30, 1000, 0, 0), T(30, 500, 0, 0), T(15, 1000, 0, 0), T(30, 2000, 0, 0), T(15, 1000, 0, 0)};
   // std::deque<TunnelMgr::Constraints> constraints_init{T(300, 3000, 0, 0)};
-  std::queue<TunnelMgr::Constraints> constraints(constraints_init);
-  
+
+  // std::queue<TunnelMgr::Constraints> constraints(constraints_init);
   // while(!constraints.empty()) {
   //   tunnel.start();
   //   tunnel.run(constraints);
   // }
+  
+  constexpr int repet = 10;
 
-  constexpr int repet = 5;
-  tunnel.run_all(repet, constraints);
+  // for(int i = 0; i < repet; ++i) {
+  //   std::queue<TunnelMgr::Constraints> constraints(constraints_init);
+    
+  //   while(!constraints.empty()) {
+  //     tunnel.start();
+  //     tunnel.run(constraints);
+  //   }
+  // }
+
+  // tunnel.exp_name = "stats_line_loss";
+  // std::queue<TunnelMgr::Constraints> loss_constraints(loss_init);
+  // tunnel.run_all(repet, loss_constraints);
+  // tunnel.reset_link();
+  
+  // constexpr int N = 4;
+  // std::array<int, N> delays = { 0, 25, 50, 100 };
+  // std::array<int, N> loss = { 0, 1, 5, 10 };
+
+  // for(int d : delays) {
+  //   for(int l : loss) {
+  //     tunnel.exp_name = fmt::format("stats_line_delay_loss_{}_{}", d, l);
+      
+  //     std::deque<TunnelMgr::Constraints> constraints_init{std::make_tuple(60,2500,d,l)};
+  //     std::queue<TunnelMgr::Constraints> constraints(constraints_init);
+  //     tunnel.run_all(repet, constraints);
+  //     tunnel.reset_link();
+  //   }
+  // }
+
+  tunnel.exp_name = "stats_line_bitrate_2";
+  std::queue<TunnelMgr::Constraints> bitrate_constraints(bitrate_init);
+  tunnel.run_all(repet, bitrate_constraints);
   
   tunnel.reset_link();
   std::this_thread::sleep_for(std::chrono::seconds{1});

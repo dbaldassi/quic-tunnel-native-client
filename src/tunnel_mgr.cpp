@@ -142,7 +142,6 @@ void TunnelMgr::parse_server_response(const json& response)
 
     client.send("startclient", START_REQUEST, data);
     
-    // server_stopped = false ??
     break;
   }
   case STOP_REQUEST:
@@ -365,8 +364,11 @@ void TunnelMgr::get_stats()
     { "medooze_dump_url", _medooze.csv_url }
   };
 
-  curl_cmd = fmt::format("curl http://localhost:4455 -Ffile=@upload.zip -Fexp=bitrate_test -Freliability={} -Fcc={} -Fimpl={}",
-			 ((out_config.datagrams) ? "dgram" : "stream"), out_config.cc, out_config.impl);
+  curl_cmd = fmt::format("curl http://localhost:4455 -Ffile=@upload.zip -Fexp={} -Freliability={} -Fcc={} -Fimpl={}",
+			 exp_name,
+			 ((out_config.datagrams) ? "dgram" : "stream"),
+			 out_config.cc,
+			 out_config.impl);
   
   server.send("getstats", GETSTATS_REQUEST, data);
 }

@@ -92,6 +92,8 @@ public:
   TunnelSocket client;
   TunnelSocket server;
 
+  std::string exp_name;
+
   std::function<void()> onstart;
   std::function<void()> onstop;
   std::function<void(/*caps*/)> oncapabilities;
